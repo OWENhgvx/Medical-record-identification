@@ -1,0 +1,34 @@
+# Python/cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local virtual environments
+.venv/
+.venv-*/
+.asr-md-venv/
+venv/
+
+# Runtime output
+runtime/
+uploads/
+*.log
+
+# Large model/package artifacts
+models/
+**/models/
+*.safetensors
+*.pt
+*.pth
+*.onnx
+dist/
+*.zip
+*.7z
+*.rar
+
+# Local OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

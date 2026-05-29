@@ -1,0 +1,19 @@
+[project]
+name = "asr-to-md-local"
+version = "0.1.0"
+description = "Standalone local Qwen3-ASR audio-to-Markdown tool."
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "python-multipart>=0.0.20",
+  "qwen-asr==0.0.6",
+  "modelscope>=1.23.0",
+  "torch>=2.5.0",
+  "librosa>=0.10.0",
+  "soundfile>=0.12.1",
+  "av>=14.0.0",
+]
+
+[project.scripts]
+asr-to-md = "asr_md.cli:main"

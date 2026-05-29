@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>语音转 md 本地工具</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f4;
+        --panel: #fff;
+        --text: #1f2a24;
+        --muted: #657067;
+        --line: #d7ddd5;
+        --accent: #2f6f5e;
+        --accent-strong: #235347;
+        --accent-soft: #e4f0eb;
+        --error: #a33b36;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      }
+
+      main {
+        width: min(1120px, 100%);
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: end;
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 28px;
+      }
+
+      p {
+        margin: 6px 0 0;
+        color: var(--muted);
+      }
+
+      .status {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel);
+        color: var(--muted);
+        padding: 8px 14px;
+        font-size: 13px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(320px, 0.75fr) minmax(420px, 1.25fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 18px;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        font-size: 18px;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+        background: #fff;
+      }
+
+      button {
+        width: 100%;
+        min-height: 40px;
+        margin-top: 12px;
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: var(--accent-strong);
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.7;
+      }
+
+      .meta {
+        display: grid;
+        gap: 8px;
+        margin-top: 14px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .meta div {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fbfcfa;
+        padding: 8px 10px;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 560px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        resize: vertical;
+        line-height: 1.75;
+        font: 14px Consolas, "Microsoft YaHei", monospace;
+      }
+
+      .error {
+        color: var(--error);
+      }
+
+      @media (max-width: 880px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        header {
+          align-items: stretch;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>语音转 md 本地工具</h1>
+          <p>上传 wav/mp3/m4a/webm/flac，输出可复制到病历生成系统的 md 文本。</p>
+        </div>
+        <div class="status" id="status">检查服务中</div>
+      </header>
+
+      <div class="grid">
+        <section>
+          <h2>上传语音</h2>
+          <label>
+            语音文件
+            <input id="audioFile" type="file" accept=".wav,.mp3,.m4a,.webm,.flac,audio/*" />
+          </label>
+          <button id="submitButton" type="button">开始识别</button>
+          <div class="meta">
+            <div id="modelInfo">模型：待识别</div>
+            <div id="timeInfo">耗时：待识别</div>
+            <div id="fallbackInfo">兜底：待识别</div>
+          </div>
+        </section>
+
+        <section>
+          <h2>md 输出</h2>
+          <textarea id="markdownOutput" spellcheck="false">暂无识别结果</textarea>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const statusEl = document.querySelector("#status");
+      const audioFile = document.querySelector("#audioFile");
+      const button = document.querySelector("#submitButton");
+      const output = document.querySelector("#markdownOutput");
+      const modelInfo = document.querySelector("#modelInfo");
+      const timeInfo = document.querySelector("#timeInfo");
+      const fallbackInfo = document.querySelector("#fallbackInfo");
+
+      async function checkHealth() {
+        try {
+          const response = await fetch("/health");
+          const data = await response.json();
+          if (!response.ok) throw new Error("服务异常");
+          statusEl.textContent = data.model_exists ? "服务正常" : "模型未下载";
+          modelInfo.textContent = `模型：${data.model_name}`;
+          fallbackInfo.textContent = `兜底模型：${data.fallback_model_exists ? "已下载" : "未下载"}`;
+        } catch (error) {
+          statusEl.textContent = "服务不可用";
+          statusEl.classList.add("error");
+        }
+      }
+
+      button.addEventListener("click", async () => {
+        const file = audioFile.files?.[0];
+        if (!file) {
+          statusEl.textContent = "请先选择语音文件";
+          return;
+        }
+
+        button.disabled = true;
+        button.textContent = "识别中";
+        statusEl.textContent = "正在识别";
+        const formData = new FormData();
+        formData.append("audio_file", file);
+        try {
+          const response = await fetch("/api/transcribe", { method: "POST", body: formData });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || "识别失败");
+          output.value = data.markdown || "";
+          modelInfo.textContent = `模型：${data.model_name}`;
+          timeInfo.textContent = `耗时：${Math.round((data.elapsed_seconds || 0) * 10) / 10} 秒`;
+          fallbackInfo.textContent = `兜底：${data.used_fallback ? data.fallback_reason || "已使用" : "未使用"}`;
+          statusEl.textContent = "识别完成";
+        } catch (error) {
+          statusEl.textContent = "识别失败";
+          output.value = error.message || "请求失败";
+        } finally {
+          button.disabled = false;
+          button.textContent = "开始识别";
+        }
+      });
+
+      checkHealth();
+    </script>
+  </body>
+</html>
